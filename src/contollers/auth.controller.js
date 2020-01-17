@@ -4,6 +4,7 @@ const User = require("../models/User");
 
 const jwt = require("jsonwebtoken");
 const config = require("../config");
+const verifyToken = require("./verifyToken");
 
 router.post("/register", async (req, res, next) => {
   const { username, email, password } = req.body;
@@ -24,12 +25,33 @@ router.post("/register", async (req, res, next) => {
   res.json({ auth: "true", token: token });
 });
 
-router.post("/login", (req, res, next) => {
-  res.json({ req: "Login" });
+router.get("/me", verifyToken, async (req, res, next) => {
+  const userFind = await User.findById(req.userId, { password: 0 });
+  if (!userFind) {
+    res.status(404).json({ status: "user non finded" });
+  }
+  res.json(userFind);
+
+  res.json({ req: "my data" });
 });
 
-router.get("/me", (req, res, next) => {
-  res.json({ req: "my data" });
+router.post("/login", async (req, res, next) => {
+  const { email, password } = req.body;
+  console.log(email, password);
+  const user = await User.findOne({ email });
+  if (!user) {
+    return res.status(404).send("email no registed");
+  }
+  const validPasswordBool = await user.validatePassword(password);
+  if (!validPasswordBool) {
+    return res.status(404).json({ auth: "false token null" });
+  }
+
+  const token = jwt.sign({ id: user._id }, config.secret, {
+    expiresIn: 60 * 60 * 24
+  });
+
+  res.json({ auth: "true", token });
 });
 
 module.exports = router;
